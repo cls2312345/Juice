@@ -3,19 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>999 Vault | Secure Access</title>
+    <title>999 Vault | Private</title>
     <style>
         :root { --accent: #9b59b6; --bg: #0a0a0a; --panel: #111; }
         body { font-family: sans-serif; background: var(--bg); color: #eee; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+        
+        /* Login Screen */
         #gatekeeper { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; }
-        .gate-box { padding: 40px; border: 1px solid var(--accent); background: var(--panel); text-align: center; border-radius: 8px; }
-        #passInput { padding: 12px; width: 200px; background: #000; border: 1px solid #333; color: var(--accent); text-align: center; font-size: 1.2rem; outline: none; }
+        .gate-box { padding: 40px; border: 1px solid var(--accent); background: var(--panel); text-align: center; border-radius: 8px; width: 300px; }
+        #passInput { padding: 12px; width: 80%; background: #000; border: 1px solid #333; color: var(--accent); text-align: center; font-size: 1.2rem; outline: none; margin-bottom: 15px; }
+        
+        /* Error/Status Messages */
+        #debugStatus { font-size: 10px; color: #666; font-family: monospace; text-transform: uppercase; letter-spacing: 1px; }
+        .err-text { color: #ff4757 !important; }
+        .success-text { color: #2ed573 !important; }
+
+        /* Main App */
         #mainApp { display: none; flex-direction: column; height: 100vh; }
         header { background: var(--panel); padding: 15px; text-align: center; border-bottom: 2px solid var(--accent); }
-        .search-box { padding: 15px; background: var(--panel); }
-        #search { width: 90%; max-width: 500px; padding: 12px; border-radius: 25px; border: 1px solid #333; background: #1a1a1a; color: white; display: block; margin: auto; }
         .song-list { flex-grow: 1; overflow-y: auto; padding: 10px; width: 100%; max-width: 800px; margin: auto; }
-        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; }
+        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; justify-content: space-between; }
         .song-item:hover { background: #1a1a1a; color: var(--accent); }
         .player-controls { background: var(--panel); padding: 20px; border-top: 1px solid #333; text-align: center; }
         audio { width: 100%; max-width: 600px; filter: invert(90%) hue-rotate(180deg); }
@@ -26,27 +33,27 @@
 
 <div id="gatekeeper">
     <div class="gate-box">
-        <h2 style="color: var(--accent); letter-spacing: 5px;">VAULT ACCESS</h2>
+        <h2 style="color: var(--accent); letter-spacing: 5px; margin-top: 0;">999 VAULT</h2>
         <input type="password" id="passInput" placeholder="ENTER CODE">
+        <div id="debugStatus">INITIALIZING...</div>
     </div>
 </div>
 
 <div id="mainApp">
-    <header><h1 style="color: var(--accent); letter-spacing: 4px;">999 VAULT</h1></header>
-    <div class="search-box"><input type="text" id="search" placeholder="Search tracks..."></div>
+    <header><h1 style="color: var(--accent); margin: 0; letter-spacing: 4px;">999 VAULT</h1></header>
     <div class="song-list" id="list"></div>
     <div class="player-controls">
-        <div id="currentTitle">READY</div>
+        <div id="currentTitle">SELECT A TRACK</div>
         <audio id="audioPlayer" controls></audio>
     </div>
 </div>
 
 <script>
-    // SAFETY WRAPPER: This waits for the HTML to exist before running
     window.addEventListener('DOMContentLoaded', () => {
         const SECRET_CODE = "DMSADMIN";
         const BUCKET_URL = "https://pub-e7c0cf4469274deb8a0ac4b35144263b.r2.dev/";
         
+        const debug = document.getElementById('debugStatus');
         const passInput = document.getElementById('passInput');
         const gate = document.getElementById('gatekeeper');
         const app = document.getElementById('mainApp');
@@ -55,18 +62,18 @@
         const titleDisplay = document.getElementById('currentTitle');
 
         let allSongs = [];
+        let isSynced = false;
 
-        passInput.addEventListener('keyup', (e) => {
-            if (passInput.value.toUpperCase() === SECRET_CODE) {
-                gate.style.display = 'none';
-                app.style.display = 'flex';
-                syncBucket();
-            }
-        });
-
+        // --- 1. INSTA-LOAD (Syncs while user sees login) ---
         async function syncBucket() {
+            debug.innerText = "CONNECTING TO STORAGE...";
             try {
                 const response = await fetch(BUCKET_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`SERVER ERROR: ${response.status}`);
+                }
+
                 const text = await response.text();
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(text, "text/xml");
@@ -78,16 +85,48 @@
                     if (name.toLowerCase().endsWith(".mp3")) allSongs.push(name);
                 }
                 
-                renderList(allSongs);
+                if (allSongs.length > 0) {
+                    allSongs.sort();
+                    renderList(allSongs);
+                    isSynced = true;
+                    debug.innerText = `READY: ${allSongs.length} SONGS LOADED`;
+                    debug.classList.add('success-text');
+                } else {
+                    debug.innerText = "ERROR: BUCKET IS EMPTY";
+                    debug.classList.add('err-text');
+                }
+
             } catch (err) {
-                titleDisplay.innerText = "SYNC ERROR: CHECK CLOUDFLARE CORS SETTINGS";
+                console.error(err);
+                if (err.message.includes('fetch')) {
+                    debug.innerText = "CORS ERROR: CHECK CLOUDFLARE SETTINGS";
+                } else {
+                    debug.innerText = "ERROR: CANNOT REACH STORAGE";
+                }
+                debug.classList.add('err-text');
             }
         }
 
+        // Start sync immediately
+        syncBucket();
+
+        // --- 2. PASSWORD LOGIC ---
+        passInput.addEventListener('keyup', () => {
+            if (passInput.value.toUpperCase() === SECRET_CODE) {
+                if (!isSynced) {
+                    alert("Please wait for songs to finish loading...");
+                    return;
+                }
+                gate.style.display = 'none';
+                app.style.display = 'flex';
+            }
+        });
+
+        // --- 3. UI RENDERING ---
         function renderList(songs) {
             listDiv.innerHTML = songs.map((s, i) => `
                 <div class="song-item" onclick="playTrack('${s}')">
-                    ${s.replace('.mp3', '').replaceAll('%20', ' ')}
+                    <span>${s.replace('.mp3', '').replaceAll('%20', ' ')}</span>
                 </div>
             `).join('');
         }
