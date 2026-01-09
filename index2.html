@@ -24,10 +24,12 @@
             padding: 12px; width: 200px; border: 1px solid #333; background: #000; 
             color: var(--accent); text-align: center; font-size: 1.2rem; outline: none; border-radius: 4px;
         }
+        #passInput:focus { border-color: var(--accent); }
         .error-msg { color: #ff4757; margin-top: 10px; font-size: 0.8rem; visibility: hidden; }
 
-        /* Main App */
+        /* Main Player (Hidden initially) */
         #mainApp { display: none; flex-direction: column; height: 100vh; }
+        
         header { background: var(--panel); padding: 15px; text-align: center; border-bottom: 2px solid var(--accent); }
         h1 { color: var(--accent); margin: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 4px; }
         .search-box { padding: 15px; background: var(--panel); }
@@ -38,22 +40,16 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
         .song-list { flex-grow: 1; overflow-y: auto; padding: 10px; width: 100%; max-width: 800px; margin: auto; }
-        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; }
+        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; justify-content: space-between; transition: 0.2s; }
         .song-item:hover { background: #1a1a1a; color: var(--accent); padding-left: 20px; }
         .playing { background: #1a1a1a; color: var(--accent); font-weight: bold; border-left: 4px solid var(--accent); }
         
-        .player-controls { background: var(--panel); padding: 20px; border-top: 1px solid #333; display: flex; flex-direction: column; align-items: center; }
+        .player-controls { background: var(--panel); padding: 20px; border-top: 1px solid #333; text-align: center; }
         audio { width: 100%; max-width: 600px; filter: invert(90%) hue-rotate(180deg); }
         
-        #currentTitle { margin-bottom: 10px; font-size: 0.9rem; color: var(--accent); font-weight: bold; }
+        #currentTitle { margin-bottom: 10px; font-size: 0.9rem; color: var(--accent); height: 20px; font-weight: bold; }
         .pulse { animation: pulse-text 1.5s infinite; }
         @keyframes pulse-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-        .btn-shuffle {
-            background: #222; color: #888; border: 1px solid #444; padding: 8px 20px; 
-            border-radius: 20px; cursor: pointer; margin-top: 10px; font-size: 12px; transition: 0.3s;
-        }
-        .shuffle-on { background: var(--accent); color: white; border-color: white; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -61,27 +57,50 @@
 <div id="gatekeeper">
     <div class="gate-box">
         <h2>VAULT ACCESS</h2>
-        <input type="password" id="passInput" placeholder="ENTER CODE">
-        <div id="error" class="error-msg">ACCESS DENIED</div>
+        <input type="password" id="passInput" placeholder="ENTER CODE" maxlength="15">
+        <div id="error" class="error-msg">ACCESS DENIED - INVALID CODE</div>
     </div>
 </div>
 
 <div id="mainApp">
     <header><h1>999 Vault</h1></header>
-    <div class="search-box"><input type="text" id="search" placeholder="Search..." onkeyup="filterSongs()"></div>
-    <div id="loadingOverlay"><div class="spinner"></div><div>DECRYPTING...</div></div>
+    <div class="search-box">
+        <input type="text" id="search" placeholder="Search unreleased tracks..." onkeyup="filterSongs()">
+    </div>
+    
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div style="font-size: 10px; letter-spacing: 2px;">DECRYPTING FROM CLOUD...</div>
+    </div>
+
     <div class="song-list" id="list"></div>
+
     <div class="player-controls">
-        <div id="currentTitle">SECURE PLAYER</div>
-        <audio id="audioPlayer" controls controlsList="nodownload" onended="handleEnded()"></audio>
-        <button id="shuffleBtn" class="btn-shuffle" onclick="toggleShuffle()">SHUFFLE: OFF</button>
+        <div id="currentTitle">PROTECTED STREAM</div>
+        <audio id="audioPlayer" controls controlsList="nodownload noplaybackrate" onended="nextTrack()"></audio>
     </div>
 </div>
 
 <script>
     const SECRET_CODE = "DMSADMIN";
     const BASE_URL = "https://pub-e7c0cf4469274deb8a0ac4b35144263b.r2.dev/";
-    let isShuffle = false;
+    
+    // Auth Logic
+    const passInput = document.getElementById('passInput');
+    const gate = document.getElementById('gatekeeper');
+    const app = document.getElementById('mainApp');
+    const error = document.getElementById('error');
+
+    passInput.addEventListener('keyup', (e) => {
+        if (passInput.value.toUpperCase() === SECRET_CODE) {
+            gate.style.display = 'none';
+            app.style.display = 'flex';
+            loadList(rawFiles);
+        } else if (passInput.value.length >= 8) {
+            error.style.visibility = 'visible';
+            setTimeout(() => { error.style.visibility = 'hidden'; passInput.value = ''; }, 1000);
+        }
+    });
 
     // Full List
     const rawFiles = ["Addicted.mp3", "Ain’t Coming Back (KKK).mp3", "Air Em Out (Freaked It).mp3", "Airport Security.mp3", "All Girls Are the Same (Remix).mp3", "All On My Own.mp3", "All Out.mp3", "All Smoke.mp3", "All Talk (Bankroll).mp3", "All Talk.mp3", "All the Same.mp3", "All Your Sins.mp3", "Alright.mp3", "Analog.mp3", "Another One.mp3", "Another Place (In the Summer).mp3", "Another Way.mp3", "Anxiety.mp3", "Any Other Way.mp3", "Anything But Normal.mp3", "AP Tik Tok (2019 My Year).mp3", "Arrow (Going M.I.A.).mp3", "Astray.mp3", "Autograph V2.mp3", "Back & Forth (Stumblin’).mp3", "Back In Chicago.mp3", "Bank Account.mp3", "Bask In The Moment (Holding You Close).mp3", "Battle Scars.mp3", "Best Believe.mp3", "Better Off (Tsunami Soul).mp3", "Better Off Alone.mp3", "Big Swag.mp3", "Bigger (Biscotti in the Air).mp3", "Billy Idol (Mary Jane).mp3", "Bird’s Eye View.mp3", "Black Out (Ca$h Out).mp3", "Blastoff V3.mp3", "Blind Fold (So Low).mp3", "Blink-182.mp3", "Blood, Sweat, Tears (Overseer).mp3", "Bloody Blade.mp3", "Blow Ya Brains.mp3", "Body Bag.mp3", "Bonnie and Clyde.mp3", "Boomerang.mp3", "Boss of Me.mp3", "Bottles.mp3", "Boy wit da Bandz.mp3", "Brand New (Goyard Bag).mp3", "Break (No Smoke V1).mp3", "Break's Over (Takeover).mp3", "Bullet for My Valentine.mp3", "Bury Me Alive (Lullabies).mp3", "Busch.mp3", "Bussin’.mp3", "Cake.mp3", "Call Me Whenever (Too Clever).mp3", "Can’t Let Go (Too Special).mp3", "Can’t Survive.mp3", "Carry It.mp3", "Casualty (Draco On Me).mp3", "Catch Up (Osama).mp3", "Challenger (Iron on Me).mp3", "Chance (New Man).mp3", "Chase My Highs.mp3", "Chase You Down.mp3", "Cheat Code (Jack and Jill).mp3", "Cheat Code (No Reload).mp3", "Chimp.mp3", "Choppa.mp3", "Classroom.mp3", "Clean (Crossing The Line).mp3", "Click Click (Incense).mp3", "Codeine Casket.mp3", "Codeine Cobain.mp3", "Codeine Guzzler.mp3", "Codeine Music (Lair).mp3", "Coffins (Perc Floating).mp3", "Come Around.mp3", "Come To Me (Work Out).mp3", "Common Sense.mp3", "Complications (Patience).mp3", "Confide.mp3", "Confused.mp3", "Contained (Change).mp3", "Coraline.mp3", "Cursed.mp3", "Darkness.mp3", "Day One.mp3", "Death Penalty.mp3", "Death Race.mp3", "Demise.mp3", "Demon Love.mp3", "Deprived.mp3", "Devil Horns.mp3", "Devil In A Red Dress (Too Real).mp3", "Die to Live.mp3", "Die To Me.mp3", "Diors.mp3", "Dirty Fanta.mp3", "Dismissed (Willing to Die).mp3", "Dolce (All of Me).mp3", "Don’t Care (Junkie).mp3", "don’t care​.mp3", "Don’t Forget Me (Forget Me Not).mp3", "Don’t Got Time.mp3", "Don’t Play (Cursed Heart).mp3", "Don’t Play (Pressure Me).mp3", "Don't Go.mp3", "Double R (Dark Tints).mp3", "Drown.mp3", "Drugs Are My Friends.mp3", "Ducks.mp3", "Dumb Slut.mp3", "Dummy.mp3", "Dylan (Can’t Be Saved).mp3", "Elevate.mp3", "Emotional Overdose (Can’t Help It).mp3", "Everlasting Love.mp3", "Everyday.mp3", "Everywhere You Go (No Wrong).mp3", "Eye Contact (Mind Control).mp3", "Eyes Closed.mp3", "Facetious.mp3", "Fadeaway (Scars).mp3", "Fall.mp3", "False Truth (Take My Soul).mp3", "Far Away (Different Dimension).mp3", "Fenty (Let It Go).mp3", "Fever.mp3", "Fire In My Lungs.mp3", "Fire.mp3", "Flaws.mp3", "Flintstones (Wartime).mp3", "Foo Foo.mp3", "For Days (Sticks).mp3", "For the Taking.mp3", "For You (I Do This).mp3", "Forever (Left You).mp3", "Forever Love.mp3", "Fridget.mp3", "Friends Die.mp3", "From Afar.mp3", "From the Bottom.mp3", "From the Start.mp3", "Further (Uncertain Shadows).mp3", "Game Over.mp3", "Game.mp3", "Gave Her All of Me.mp3", "Gentleman (Blue Shit).mp3", "Get Over It (Heart of Mine).mp3", "Girl With The Blonde Hair.mp3", "Girlfriend.mp3", "Give Me My Fix.mp3", "GO GO (.38 Special).mp3", "Go Home.mp3", "GO.mp3", "Golden X Get Away.mp3", "Good Days.mp3", "GoPro.mp3", "Got My Mask Off (Stick Up).mp3", "Got Nothing on Me.mp3", "Grace.mp3", "Grateful.mp3", "GTA.mp3", "Gun You Down.mp3", "Had To (Stabbed You).mp3", "Haha.mp3", "Hairline Trigger.mp3", "Hand On My Chest (Tears).mp3", "Happiness (RUN Remix).mp3", "Happy Life.mp3", "Hard to Digest (Mr. Miyagi).mp3", "Hate Her Friends.mp3", "Haunted By Real Life.mp3", "Heart Exposure.mp3", "Heat Seeker (Come On Wit It).mp3", "Heavy Metal.mp3", "Heavy.mp3", "Hectic.mp3", "Help Me (27 Club).mp3", "Help Me (Move On).mp3", "Hennessy.mp3", "Here I Go Again (Mansion).mp3", "Here We Go Again.mp3", "Hey Mister.mp3", "Hey Wonderland.mp3", "High Again (Withdrawals).mp3", "High All Week.mp3", "High Tide.mp3", "Higher (Maserati).mp3", "Hilfiger (Swisher).mp3", "His To Keep.mp3", "Hit (Issues).mp3", "Hit a Lick.mp3", "Honest.mp3", "How It Feel.mp3", "Hunt You Down (My Spot).mp3", "Hypnotic.mp3", "I Don’t Know.mp3", "I Don't Need It.mp3", "I Know One Thing.mp3", "I Know What You Want.mp3", "I LOVE IT.mp3", "I Swear.mp3", "I’m The Shit.mp3", "Ignorant (Killing My Vibe).mp3", "In My Arms (Bad News).mp3", "In The Trap.mp3", "In The Wind.mp3", "In This Bitch.mp3", "Infatuated.mp3", "Infrared.mp3", "Inspire Me (Irony).mp3", "Irony.mp3", "Jack Wit’ A Bean.mp3", "Javelin (Drivin’ So Fast).mp3", "Jordan.mp3", "Journey.mp3", "Juck (Dome).mp3", "Juicy.mp3", "K Like A Russian.mp3", "Karate Kid.mp3", "Kawasaki.mp3", "Keep Save (Murder Rate).mp3", "Keep Up.mp3", "Key Card (Impatient).mp3", "Kickflip.mp3", "Kicks (Rugrats).mp3", "King Kong (Kiki).mp3", "Kirby’s Selecta.mp3", "Kurtis Blow.mp3", "Larry Bird (Ball).mp3", "Late Night (Amazing).mp3", "Lavish.mp3", "Lean With It (Horrible).mp3", "Lemon Glow (All Be High).mp3", "Let Go (Hit the Road).mp3", "Let Her Leave.mp3", "Let Me Go (Left Me Cold).mp3", "LETS GO.mp3", "Life Chase.mp3", "Life’s A Dungeon.mp3", "Life’s a Mess.mp3", "Like A Ghost.mp3", "Live Forever.mp3", "Lock Box.mp3", "London Interlude.mp3", "London Tipton.mp3", "Lonely Road (Survive).mp3", "Long Time Coming.mp3", "Look at Me.mp3", "Loose Screw.mp3", "Lose a Dream.mp3", "Lose You (Used To).mp3", "Lost Cause.mp3", "Lost Myself (Kiss And Tell).mp3", "Love and Leave Them.mp3", "Love Over There.mp3", "Love You Always (Starfire).mp3", "Luigi (Twins).mp3", "Lurkin’ (Lotti Lotti).mp3", "Made It Work (Under 25).mp3", "Make It Sell.mp3", "Make No Noise.mp3", "Man Down (Do Re Mi).mp3", "Matrix (Different Phases).mp3", "Matt Hardy 999.mp3", "Me.mp3", "Meagan Good.mp3", "Meant Forever (Keep It).mp3", "Melody.mp3", "Minus.mp3", "Misery Avenue.mp3", "Misunderstood.mp3", "Molly & Mike.mp3", "Moment (Man Down).mp3", "Moncler Year.mp3", "Money Hunt.mp3", "Money Long.mp3", "Money War.mp3", "Morgue (All Before).mp3", "Morphine.mp3", "Motions.mp3", "Mr Freeze (Für Elise).mp3", "Mr. Heartbreak.mp3", "Muddy (Kill All My Troubles).mp3", "Must Be Nice (Fireflies).mp3", "My Time.mp3", "Narcotics.mp3", "NASCAR.mp3", "Nesquik.mp3", "Never Cared (Young God).mp3", "New Girl (Latex).mp3", "Nightmare.mp3", "Nintendo.mp3", "NLMB Oh Dear.mp3", "No Benefits.mp3", "No Hands.mp3", "No Hook.mp3", "No Jumper (I Wonder Why).mp3", "No Laces.mp3", "No Love, No Trust 999.mp3", "No Time.mp3", "Nobody.mp3", "Northside (Relax).mp3", "Not Ashamed.mp3", "Not That Easy (Codependent).mp3", "Numb the Pain.mp3", "Obsessed (Cerebral).mp3", "Off The Rip (Gamble).mp3", "Oh No (Faded).mp3", "Oh Yeah I Did (Boondocks).mp3", "OJ Glove.mp3", "OK (Leave Me Alone).mp3", "On & On.mp3", "On a Plane.mp3", "On My Own (All Alone).mp3", "On The Low (What I Need).mp3", "On The Regular (Left-Right).mp3", "On The Run.mp3", "On Time.mp3", "Orange (Keepin’ It Clean).mp3", "Oreo.mp3", "Out My Body.mp3", "Over & Over.mp3", "Over Sprung (My Way Home).mp3", "Overdose (911).mp3", "Paranoid (New Shit).mp3", "Pause.mp3", "Perc Heavy.mp3", "Percaholic (Life’s Not Fair).mp3", "Percs (Operas).mp3", "Persona (Naruto).mp3", "Pesos (Troubled Kids).mp3", "Pieces.mp3", "Pink Toes.mp3", "Play Fair.mp3", "Play Your Role.mp3", "playing games (i’m not playing fair).mp3", "Plug.mp3", "Pop It.mp3", "Pop Rock (Pop-Tart).mp3", "pop-punkstar.mp3", "Porridge.mp3", "Pour Up A 6 (Call The Feds).mp3", "Pre Heat.mp3", "Priceless (Wraith).mp3", "Prime Time.mp3", "Psychedelic (Feeling Myself).mp3", "Purple Devil.mp3", "Purple Moncler.mp3", "Purple Rain.mp3", "Purple Substance.mp3", "Put Me Down.mp3", "Quitter (No Good Woman).mp3", "Race Beginning.mp3", "Racks (Stacks Up).mp3", "Racks In.mp3", "Racks Out (Best Around).mp3", "Radio.mp3", "Range.mp3", "Reach Freestyle.mp3", "Realize.mp3", "Rebel Blood.mp3", "Red Dead Redemption.mp3", "Relapse.mp3", "Remind Me Of The Summer.mp3", "Rental.mp3", "Right Now.mp3", "Right Or Wrong.mp3", "Rikers.mp3", "Road Rage.mp3", "Road Runners.mp3", "Rock.mp3", "ROCKSTAR GIRL.mp3", "Rockstar Status.mp3", "Rodents.mp3", "Ronald (Want To).mp3", "Run a Fade.mp3", "Run Away.mp3", "Rush.mp3", "Safe.mp3", "Same to Me (Gone).mp3", "Sanity.mp3", "Scarface.mp3", "Scissors.mp3", "Semi Addict.mp3", "Sexual Healing.mp3", "Shadows (Sorrows).mp3", "She On Go (In The Moment).mp3", "Shoot For Love.mp3", "Shot Em Down.mp3", "Show n Tell (Whip).mp3", "Sic ’Em.mp3", "Sideshow (Rob a Bank).mp3", "Sidewalk.mp3", "Simple (Living At The Top).mp3", "Sippin’ Red (Sprite Bleeding).mp3", "Slasher.mp3", "Sleep Paralysis.mp3", "Slenderman.mp3", "Slide.mp3", "Slow Me Down (Diners).mp3", "Smoke A Half.mp3", "So Hard.mp3", "Sober (Electric Chair).mp3", "Some More.mp3", "Someone New (BITTER ASFF).mp3", "Something To Prove.mp3", "Sour (Kryptonite).mp3", "Space (Too Far).mp3", "Spanglish.mp3", "Speed Demon (90210).mp3", "Starstruck.mp3", "Stick Talk (Lavagirl).mp3", "Stranger.mp3", "Stuck In My Ways.mp3", "Sun.mp3", "Super Saiyan (Styrofoam).mp3", "Swerve.mp3", "Tag.mp3", "Take 2 (Martian).mp3", "Take A Pic (Dover).mp3", "Take My Soul (I Can’t Go).mp3", "Take My Time.mp3", "Take Off.mp3", "Tales of the Toxic.mp3", "Talking To Voices.mp3", "Tarzan (In My Bag).mp3", "Taskforce.mp3", "Tell Your Friends.mp3", "Tempted.mp3", "Thank Me Later (Haters).mp3", "That Sad Shit.mp3", "The Race.mp3", "They All Talk.mp3", "Threw A Fit.mp3", "Thrills.mp3", "Through My Head.mp3", "Tick Tock (In The Air).mp3", "Tick Tock.mp3", "Time Anymore.mp3", "To The Grave (Feelings).mp3", "Together (My Gang).mp3", "Tonight.mp3", "Too Far.mp3", "Track Race (Scarface).mp3", "Traveling (Inner Peace).mp3", "Trees.mp3", "Trifling.mp3", "Triple 9 V2.mp3", "Triple 9.mp3", "Tropical Storm (I Wonder).mp3", "Trust Issues.mp3", "Try Me.mp3", "Uh Huh.mp3", "Uh Woah (Codeiner).mp3", "Under Her Skin.mp3", "Underwrld.mp3", "Unexplainable (Look Again).mp3", "Unload.mp3", "Until I Die (Party In My Mind).mp3", "Up in London.mp3", "Vicehurt (R.I.P. Jahseh).mp3", "Vinci (Been Myself).mp3", "Visine.mp3", "Wake Up (Amazing).mp3", "Wavy.mp3", "Way Too Many.mp3", "We Ain’t Goin’.mp3", "We Don’t Get Along.mp3", "What Else.mp3", "What The Drugs Do.mp3", "What’s Brakkin’.mp3", "Where I Need To Be (Set Me Free).mp3", "whimpers in the darkness.mp3", "Whistles.mp3", "Won’t Die (Conjuring).mp3", "Wrong Time.mp3", "Yeah Yeah Yeah.mp3", "You Ain't Safe.mp3", "You Don’t Know Me.mp3", "You.mp3", "You’re Done.mp3", "Z Nation.mp3", "Zero Toleration.mp3", "Zombie Shit (Left 4 Dead).mp3", "Zoom.mp3", "2 Seat (Lifestyle Urgent).mp3", "2 Seats (Both Sides).mp3", "3AM in Manhattan (Push Me Away).mp3", "4 Words.mp3", "5 Bitches (500 Carats).mp3", "5AM Outro (I’m Cool).mp3", "8 Minute Freestyle.mp3", "24 Hours.mp3", "24-7 (365).mp3", "27 Club (Show Me Love).mp3", "'70s.mp3", "A OK (On Tour).mp3", "Abyss (The Party Never Ends).mp3", "Abyss Interlude (Ups and Downs).mp3", "Act Right.mp3"];
@@ -89,37 +108,28 @@
     let filteredFiles = [...rawFiles];
     let currentIndex = 0;
     const player = document.getElementById('audioPlayer');
+    const listDiv = document.getElementById('list');
+    const overlay = document.getElementById('loadingOverlay');
     const titleDisplay = document.getElementById('currentTitle');
 
-    // Password Access
-    document.getElementById('passInput').onkeyup = (e) => {
-        if (e.target.value.toUpperCase() === SECRET_CODE) {
-            document.getElementById('gatekeeper').style.display = 'none';
-            document.getElementById('mainApp').style.display = 'flex';
-            loadList(rawFiles);
-        }
+    // Security
+    document.onkeydown = (e) => {
+        if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74)) || (e.ctrlKey && e.keyCode == 85)) return false;
     };
 
     function loadList(files) {
-        document.getElementById('list').innerHTML = files.map((file, index) => `
+        listDiv.innerHTML = files.map((file, index) => `
             <div class="song-item" id="song-${index}" onclick="playSong(${index})">
-                ${file.replace('.mp3', '')}
+                <span>${file.replace('.mp3', '')}</span>
             </div>
         `).join('');
-    }
-
-    function toggleShuffle() {
-        isShuffle = !isShuffle;
-        const btn = document.getElementById('shuffleBtn');
-        btn.innerText = isShuffle ? "SHUFFLE: ON" : "SHUFFLE: OFF";
-        btn.classList.toggle('shuffle-on', isShuffle);
     }
 
     function playSong(index) {
         currentIndex = index;
         const fileName = filteredFiles[index];
-        document.getElementById('loadingOverlay').style.display = 'block';
-        titleDisplay.innerText = "LOADING...";
+        overlay.style.display = 'block';
+        titleDisplay.innerText = "BUFFERING...";
         titleDisplay.classList.add('pulse');
 
         player.src = BASE_URL + encodeURIComponent(fileName);
@@ -127,26 +137,18 @@
 
         document.querySelectorAll('.song-item').forEach(el => el.classList.remove('playing'));
         const active = document.getElementById(`song-${index}`);
-        if(active) {
-            active.classList.add('playing');
-            active.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        if(active) active.classList.add('playing');
     }
 
     player.oncanplay = () => {
-        document.getElementById('loadingOverlay').style.display = 'none';
+        overlay.style.display = 'none';
         titleDisplay.classList.remove('pulse');
         titleDisplay.innerText = filteredFiles[currentIndex].replace('.mp3', '');
         player.play();
     };
 
-    function handleEnded() {
-        if (isShuffle) {
-            let nextIndex = Math.floor(Math.random() * filteredFiles.length);
-            playSong(nextIndex);
-        } else {
-            if (currentIndex < filteredFiles.length - 1) playSong(currentIndex + 1);
-        }
+    function nextTrack() {
+        if (currentIndex < filteredFiles.length - 1) playSong(currentIndex + 1);
     }
 
     function filterSongs() {
