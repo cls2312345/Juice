@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>999 Vault | Private</title>
+    <title>999 Vault | Private Access</title>
     <style>
         :root { --accent: #9b59b6; --bg: #0a0a0a; --panel: #111; }
         body { 
@@ -11,6 +11,7 @@
             margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
             -webkit-user-select: none; user-select: none;
         }
+        /* Login Overlay */
         #gatekeeper {
             position: fixed; inset: 0; background: #000; z-index: 9999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -18,45 +19,49 @@
         .gate-box { padding: 40px; border: 1px solid var(--accent); border-radius: 8px; background: var(--panel); text-align: center; }
         #passInput { 
             padding: 12px; width: 220px; border: 1px solid #333; background: #000; 
-            color: var(--accent); text-align: center; font-size: 1.2rem; outline: none;
+            color: var(--accent); text-align: center; font-size: 1.2rem; outline: none; border-radius: 4px;
         }
+        /* Main Vault Layout */
         #mainApp { display: none; flex-direction: column; height: 100vh; }
         header { background: var(--panel); padding: 15px; text-align: center; border-bottom: 2px solid var(--accent); }
+        h1 { color: var(--accent); margin: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 4px; }
         .search-box { padding: 15px; background: var(--panel); }
         #search { width: 90%; max-width: 500px; padding: 12px; border-radius: 25px; border: 1px solid #333; background: #1a1a1a; color: white; display: block; margin: auto; outline: none; }
         .song-list { flex-grow: 1; overflow-y: auto; padding: 10px; width: 100%; max-width: 800px; margin: auto; }
-        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; }
+        .song-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; }
         .song-item:hover { background: #1a1a1a; color: var(--accent); padding-left: 20px; }
         .playing { background: #1a1a1a; color: var(--accent); font-weight: bold; border-left: 4px solid var(--accent); }
+        /* Controls */
         .player-controls { background: var(--panel); padding: 20px; border-top: 1px solid #333; text-align: center; }
         audio { width: 100%; max-width: 600px; filter: invert(90%) hue-rotate(180deg); }
-        #currentTitle { margin-bottom: 10px; font-size: 0.9rem; color: var(--accent); font-weight: bold; }
-        #loadingOverlay { display: none; margin-bottom: 10px; color: var(--accent); font-size: 12px; letter-spacing: 2px; }
+        #currentTitle { margin-bottom: 10px; font-size: 0.9rem; color: var(--accent); font-weight: bold; min-height: 1.2em; }
+        #syncStatus { font-size: 10px; color: #555; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div id="gatekeeper">
     <div class="gate-box">
-        <h2 style="color: var(--accent); letter-spacing: 5px;">VAULT ACCESS</h2>
+        <h2 style="color: var(--accent); letter-spacing: 5px; margin-top: 0;">VAULT ACCESS</h2>
         <input type="password" id="passInput" placeholder="ENTER CODE">
-        <p id="err" style="color: red; font-size: 12px; margin-top: 10px; visibility: hidden;">INVALID ACCESS CODE</p>
+        <p id="err" style="color: #ff4757; font-size: 12px; margin-top: 15px; visibility: hidden;">ACCESS DENIED</p>
     </div>
 </div>
 
 <div id="mainApp">
     <header><h1>999 Vault</h1></header>
-    <div class="search-box"><input type="text" id="search" placeholder="Search tracklist..."></div>
+    <div class="search-box"><input type="text" id="search" placeholder="Search the unreleased collection..."></div>
     <div class="song-list" id="list"></div>
     <div class="player-controls">
-        <div id="loadingOverlay">SYNCING BUCKET...</div>
-        <div id="currentTitle">READY TO STREAM</div>
+        <div id="currentTitle">SELECT A TRACK</div>
         <audio id="audioPlayer" controls controlsList="nodownload"></audio>
+        <div id="syncStatus">AUTO-SYNC ACTIVE</div>
     </div>
 </div>
 
 <script>
-    window.onload = function() {
+    // Using an event listener for DOMContentLoaded ensures the HTML exists before the script runs
+    document.addEventListener('DOMContentLoaded', function() {
         const SECRET_CODE = "DMSADMIN";
         const BUCKET_URL = "https://pub-e7c0cf4469274deb8a0ac4b35144263b.r2.dev/";
         
@@ -67,30 +72,30 @@
         const player = document.getElementById('audioPlayer');
         const titleDisplay = document.getElementById('currentTitle');
         const searchInput = document.getElementById('search');
-        const loader = document.getElementById('loadingOverlay');
 
         let allSongs = [];
         let filteredSongs = [];
 
-        // 1. Password Logic
+        // --- 1. ACCESS CONTROL ---
         passInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter' || passInput.value.toUpperCase() === SECRET_CODE) {
-                if (passInput.value.toUpperCase() === SECRET_CODE) {
-                    gate.style.display = 'none';
-                    app.style.display = 'flex';
-                    syncBucket();
-                } else if (passInput.value.length >= 8) {
-                    document.getElementById('err').style.visibility = 'visible';
-                    setTimeout(() => { document.getElementById('err').style.visibility = 'hidden'; }, 2000);
-                }
+            const val = passInput.value.toUpperCase();
+            if (val === SECRET_CODE) {
+                gate.style.display = 'none';
+                app.style.display = 'flex';
+                syncBucket();
+            } else if (e.key === 'Enter' && val !== SECRET_CODE) {
+                document.getElementById('err').style.visibility = 'visible';
+                passInput.value = '';
+                setTimeout(() => { document.getElementById('err').style.visibility = 'hidden'; }, 2000);
             }
         });
 
-        // 2. Auto-Sync Logic
+        // --- 2. AUTO-SYNC FROM R2 STORAGE ---
         async function syncBucket() {
-            loader.style.display = 'block';
             try {
                 const response = await fetch(BUCKET_URL);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
                 const text = await response.text();
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(text, "text/xml");
@@ -99,57 +104,61 @@
                 allSongs = [];
                 for (let i = 0; i < keys.length; i++) {
                     let name = keys[i].textContent;
-                    if (name.endsWith(".mp3")) allSongs.push(name);
+                    if (name.toLowerCase().endsWith(".mp3")) {
+                        allSongs.push(name);
+                    }
                 }
                 
+                // Sort alphabetically
+                allSongs.sort();
                 filteredSongs = [...allSongs];
                 renderList(filteredSongs);
+                document.getElementById('syncStatus').innerText = `VAULT SYNCED: ${allSongs.length} TRACKS`;
             } catch (err) {
-                titleDisplay.innerText = "SYNC FAILED - CHECK CORS SETTINGS";
-                console.error(err);
+                console.error("CORS or Connection Error:", err);
+                titleDisplay.innerText = "SYNC ERROR: CHECK CLOUDFLARE CORS SETTINGS";
+                document.getElementById('syncStatus').innerText = "OFFLINE MODE - SYNC FAILED";
             }
-            loader.style.display = 'none';
         }
 
-        // 3. UI Logic
+        // --- 3. UI RENDERING ---
         function renderList(songs) {
             listDiv.innerHTML = songs.map((s, i) => `
-                <div class="song-item" data-index="${i}">
-                    ${s.replace('.mp3', '').replaceAll('%20', ' ')}
+                <div class="song-item" id="item-${i}" onclick="playTrack(${i})">
+                    <span>${s.replace('.mp3', '').replaceAll('%20', ' ')}</span>
+                    <span style="opacity: 0.3; font-size: 0.8em;">MP3</span>
                 </div>
             `).join('');
-
-            document.querySelectorAll('.song-item').forEach(item => {
-                item.onclick = () => {
-                    const idx = item.getAttribute('data-index');
-                    playTrack(idx);
-                };
-            });
         }
 
-        function playTrack(index) {
+        window.playTrack = function(index) {
             const fileName = filteredSongs[index];
-            player.src = BUCKET_URL + fileName;
+            player.src = BUCKET_URL + encodeURIComponent(fileName);
             player.play();
             titleDisplay.innerText = fileName.replace('.mp3', '').replaceAll('%20', ' ');
             
+            // Highlight active song
             document.querySelectorAll('.song-item').forEach(el => el.classList.remove('playing'));
-            const active = document.querySelector(`[data-index="${index}"]`);
+            const active = document.getElementById(`item-${index}`);
             if(active) active.classList.add('playing');
-        }
+        };
 
-        // 4. Search Logic
-        searchInput.onkeyup = () => {
+        // --- 4. SEARCH ---
+        searchInput.addEventListener('input', () => {
             const term = searchInput.value.toLowerCase();
             filteredSongs = allSongs.filter(s => s.toLowerCase().includes(term));
             renderList(filteredSongs);
-        };
+        });
 
-        // 5. Security - Block Inspect Element
-        document.onkeydown = (e) => {
-            if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74))) return false;
-        };
-    };
+        // --- 5. SECURITY ---
+        document.addEventListener('keydown', (e) => {
+            // Block F12, Ctrl+Shift+I, Ctrl+U
+            if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74)) || (e.ctrlKey && e.keyCode == 85)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
 </script>
 </body>
 </html>
