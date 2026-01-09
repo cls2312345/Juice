@@ -1,23 +1,39 @@
 <script>
     const SECRET_CODE = "DMSADMIN";
-    // Your Public Bucket URL (The XML endpoint is usually the base URL)
     const BUCKET_URL = "https://pub-e7c0cf4469274deb8a0ac4b35144263b.r2.dev/";
     
-    let rawFiles = []; // This starts empty and fills automatically
-    let filteredFiles = [];
-    let currentIndex = 0;
+    let rawFiles = [];
     const player = document.getElementById('audioPlayer');
-    const titleDisplay = document.getElementById('currentTitle');
 
-    // 1. AUTO-CHECK STORAGE FUNCTION
+    // Emergency manual check - type password and hit Enter
+    document.getElementById('passInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            checkPass();
+        }
+    });
+
+    async function checkPass() {
+        const val = document.getElementById('passInput').value.toUpperCase();
+        if (val === SECRET_CODE) {
+            document.getElementById('gatekeeper').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'flex';
+            await syncVault();
+        } else {
+            alert("WRONG CODE");
+        }
+    }
+
     async function syncVault() {
         try {
-            const response = await fetch(BUCKET_URL);
+            // Using a timeout so it doesn't stay white forever
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(BUCKET_URL, { signal: controller.signal });
             const text = await response.text();
             const parser = new DOMParser();
             const xml = parser.parseFromString(text, "text/xml");
             
-            // Scans the XML response for <Key> tags (filenames)
             const keys = xml.getElementsByTagName("Key");
             rawFiles = [];
             
@@ -28,31 +44,30 @@
                 }
             }
             
-            filteredFiles = [...rawFiles];
-            loadList(filteredFiles);
-            console.log("Vault Synced: " + rawFiles.length + " songs found.");
+            if(rawFiles.length === 0) {
+                document.getElementById('currentTitle').innerText = "NO SONGS FOUND IN BUCKET";
+            }
+            
+            loadList(rawFiles);
         } catch (err) {
-            console.error("Sync failed. Check CORS settings.", err);
-            titleDisplay.innerText = "SYNC ERROR - CHECK CORS";
+            console.error(err);
+            document.getElementById('currentTitle').innerText = "SYNC FAILED - CHECK CLOUDFLARE CORS";
         }
     }
 
-    // Password Access
-    document.getElementById('passInput').onkeyup = (e) => {
-        if (e.target.value.toUpperCase() === SECRET_CODE) {
-            document.getElementById('gatekeeper').style.display = 'none';
-            document.getElementById('mainApp').style.display = 'flex';
-            syncVault(); // Runs the auto-check as soon as you log in
-        }
-    };
-
     function loadList(files) {
-        document.getElementById('list').innerHTML = files.map((file, index) => `
-            <div class="song-item" id="song-${index}" onclick="playSong(${index})">
+        const listDiv = document.getElementById('list');
+        if (!listDiv) return;
+        listDiv.innerHTML = files.map((file, index) => `
+            <div class="song-item" onclick="playSong('${file}', ${index})">
                 ${file.replace('.mp3', '').replaceAll('%20', ' ')}
             </div>
         `).join('');
     }
 
-    // ... (Keep your existing playSong, toggleShuffle, and handleEnded functions) ...
+    function playSong(file, index) {
+        player.src = BUCKET_URL + file;
+        player.play();
+        document.getElementById('currentTitle').innerText = file.replace('.mp3', '');
+    }
 </script>
